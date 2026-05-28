@@ -53,14 +53,23 @@ def format_message(ranking: pd.DataFrame) -> str:
     lines.append("")
     lines.append(f"<b>📊 TOP {TOP_N}</b>")
     lines.append("<pre>")
+    lines.append(" # Symbol     Score  Dir   Conv   Fund     L/S   OI(M)")
     for _, r in ranking.head(TOP_N).iterrows():
         sym  = r['symbol'].replace('/USDT:USDT', '')
         d    = r.get('direction', 'WAIT')
         icon = '▲' if d == 'LONG' else '▼' if d == 'SHORT' else '─'
+        fr   = r.get('funding_rate_raw')
+        ls   = r.get('ls_ratio_raw')
+        oi   = r.get('oi_raw')
+        fr_s = f"{fr*100:+.4f}%" if pd.notna(fr) else '   N/A '
+        ls_s = f"{ls:.2f}"       if pd.notna(ls) else ' N/A'
+        oi_s = f"{oi/1e6:>5.1f}" if pd.notna(oi) else '  N/A'
         lines.append(
             f"{int(r['rank']):>2} {sym:<10} "
-            f"{r['composite_score']:+.3f}  "
-            f"{icon} {d:<5} c={r['conviction']:+.2f}"
+            f"{r['composite_score']:+.2f}  "
+            f"{icon}{d:<4} "
+            f"{r['conviction']:+.2f}  "
+            f"{fr_s:>7}  {ls_s:>4}  {oi_s}"
         )
     lines.append("</pre>")
 
