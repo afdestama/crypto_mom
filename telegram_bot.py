@@ -15,6 +15,7 @@ except ImportError:
     pass
 
 from main import main as run_scanner
+import config
 
 TOKEN   = os.environ['TELEGRAM_BOT_TOKEN']
 CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
@@ -62,24 +63,12 @@ def format_message(ranking: pd.DataFrame) -> str:
         )
     lines.append("</pre>")
 
-    buy = ranking[(ranking['direction'] == 'LONG') & (ranking['conviction'] > 0.8)]
+    ls_col = ranking.get('ls_ratio_raw')
+    ls_ok  = ls_col.isna() | (ls_col < config.LS_EXTREME_THRESH) if ls_col is not None else True
+    buy = ranking[(ranking['direction'] == 'LONG') & (ranking['conviction'] > 0.5) & ls_ok]
     if not buy.empty:
-        lines.append("\n<b>▲ BELI (conv &gt; 0.8)</b>")
+        lines.append(f"\n<b>▲ BELI (conv &gt; 0.5, L/S &lt; {config.LS_EXTREME_THRESH})</b>")
         for _, r in buy.iterrows():
-            sym = r['symbol'].replace('/USDT:USDT', '')
-            fr  = r.get('funding_rate_raw')
-            ls  = r.get('ls_ratio_raw')
-            fr_s = f"{fr*100:+.4f}%" if pd.notna(fr) else 'N/A'
-            ls_s = f"{ls:.2f}"       if pd.notna(ls) else 'N/A'
-            lines.append(
-                f"• <code>{sym}</code> conv {r['conviction']:+.2f}  "
-                f"fr {fr_s}  L/S {ls_s}"
-            )
-
-    sell = ranking[(ranking['direction'] == 'SHORT') & (ranking['conviction'] < -0.8)]
-    if not sell.empty:
-        lines.append("\n<b>▼ JUAL (conv &lt; -0.8)</b>")
-        for _, r in sell.iterrows():
             sym = r['symbol'].replace('/USDT:USDT', '')
             fr  = r.get('funding_rate_raw')
             ls  = r.get('ls_ratio_raw')
@@ -93,7 +82,6 @@ def format_message(ranking: pd.DataFrame) -> str:
     counts = ranking['direction'].value_counts().to_dict()
     lines.append(
         f"\nCounts: LONG {counts.get('LONG', 0)} · "
-        f"SHORT {counts.get('SHORT', 0)} · "
         f"WAIT {counts.get('WAIT', 0)}"
     )
     return "\n".join(lines)

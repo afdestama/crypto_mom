@@ -103,18 +103,8 @@ def compute_trade_decision(row: pd.Series, regime: str = 'reversal',
         (pd.notna(ls_val) and float(ls_val) > config.LS_EXTREME_THRESH)
     )
 
-    btc_mode = (btc_mode or 'BULL').upper()
-    if btc_mode == 'NEUTRAL':
-        direction = 'WAIT'
-    else:
-        long_signal  = (score >  0.5 and long_ok)  and btc_mode in ('BULL', 'OFF')
-        short_signal = (score < -0.5 and short_ok) and btc_mode in ('BEAR', 'OFF')
-        if long_signal:
-            direction = 'LONG'
-        elif short_signal:
-            direction = 'SHORT'
-        else:
-            direction = 'WAIT'
+    # LONG-only mode: SHORT tidak pernah di-emit
+    direction = 'LONG' if (score > 0.5 and long_ok) else 'WAIT'
 
     return direction, round(score, 3), notes
 
@@ -278,56 +268,26 @@ def _print_execution_summary(latest: pd.DataFrame, btc_mode: str = 'BULL'):
     print(f"  EKSEKUSI — HIGH CONVICTION  [BTC mode: {btc_mode}]")
     print(f"{'█'*60}")
 
-    if btc_mode == 'NEUTRAL':
-        print(f"\n  🟡 BTC tidak konklusif (composite di rentang [{config.BTC_GATE_SHORT_THR}, "
-              f"{config.BTC_GATE_LONG_THR}])")
-        print(f"     → tidak ada eksekusi. PANTAU only.")
+    ls_ok = ls.isna() | (ls < config.LS_EXTREME_THRESH)
+    buy = latest[
+        (d == 'LONG') & (cv > 0.5) & ls_ok
+    ].sort_values('conviction', ascending=False)
+
+    if not buy.empty:
+        print(f"\n  ▲ BELI  (LONG + Conv>0.5 + L/S tidak overcrowded)")
+        print(f"  {'Symbol':<26} {'Conv':>5}  {'Funding':>10}  {'L/S':>5}  {'OI(M)':>8}")
+        print(f"  {'-'*60}")
+        for _, r in buy.iterrows():
+            ls_v = r.get('ls_ratio_raw', np.nan)
+            fr_v = r.get('funding_rate_raw', np.nan)
+            oi_v = r.get('oi_raw', np.nan)
+            ls_s = f"{ls_v:.2f}"       if pd.notna(ls_v) else '  N/A'
+            fr_s = f"{fr_v*100:+.4f}%" if pd.notna(fr_v) else '       N/A'
+            oi_s = f"{oi_v/1e6:.1f}"   if pd.notna(oi_v) else '     N/A'
+            print(f"  {r['symbol']:<26} {r['conviction']:>5.2f}  "
+                  f"{fr_s:>10}  {ls_s:>5}  {oi_s:>8}")
     else:
-        show_long  = btc_mode in ('BULL', 'OFF')
-        show_short = btc_mode in ('BEAR', 'OFF')
-
-        if show_long:
-            ls_ok = ls.isna() | (ls < config.LS_EXTREME_THRESH)
-            buy = latest[
-                (d == 'LONG') & (cv > 0.8) & ls_ok
-            ].sort_values('conviction', ascending=False)
-
-            if not buy.empty:
-                print(f"\n  ▲ BELI  (LONG + Conv>0.8 + L/S tidak overcrowded)")
-                print(f"  {'Symbol':<26} {'Conv':>5}  {'Funding':>10}  {'L/S':>5}  {'OI(M)':>8}")
-                print(f"  {'-'*60}")
-                for _, r in buy.iterrows():
-                    ls_v = r.get('ls_ratio_raw', np.nan)
-                    fr_v = r.get('funding_rate_raw', np.nan)
-                    oi_v = r.get('oi_raw', np.nan)
-                    ls_s = f"{ls_v:.2f}"       if pd.notna(ls_v) else '  N/A'
-                    fr_s = f"{fr_v*100:+.4f}%" if pd.notna(fr_v) else '       N/A'
-                    oi_s = f"{oi_v/1e6:.1f}"   if pd.notna(oi_v) else '     N/A'
-                    print(f"  {r['symbol']:<26} {r['conviction']:>5.2f}  "
-                          f"{fr_s:>10}  {ls_s:>5}  {oi_s:>8}")
-            else:
-                print(f"\n  ▲ BELI  — tidak ada kandidat (Conv>0.8 + L/S<{config.LS_EXTREME_THRESH})")
-
-        if show_short:
-            sell = latest[
-                (d == 'SHORT') & (cv < -0.8)
-            ].sort_values('conviction', ascending=True)
-
-            if not sell.empty:
-                print(f"\n  ▼ JUAL / SHORT  (SHORT + Conv<-0.8 + funding>0 atau L/S>{config.LS_EXTREME_THRESH})")
-                print(f"  {'Symbol':<26} {'Conv':>5}  {'Funding':>10}  {'L/S':>5}  {'OI(M)':>8}")
-                print(f"  {'-'*60}")
-                for _, r in sell.iterrows():
-                    ls_v = r.get('ls_ratio_raw', np.nan)
-                    fr_v = r.get('funding_rate_raw', np.nan)
-                    oi_v = r.get('oi_raw', np.nan)
-                    ls_s = f"{ls_v:.2f}"       if pd.notna(ls_v) else '  N/A'
-                    fr_s = f"{fr_v*100:+.4f}%" if pd.notna(fr_v) else '       N/A'
-                    oi_s = f"{oi_v/1e6:.1f}"   if pd.notna(oi_v) else '     N/A'
-                    print(f"  {r['symbol']:<26} {r['conviction']:>5.2f}  "
-                          f"{fr_s:>10}  {ls_s:>5}  {oi_s:>8}")
-            else:
-                print(f"\n  ▼ JUAL — tidak ada kandidat (Conv<-0.8 + filter funding/LS)")
+        print(f"\n  ▲ BELI  — tidak ada kandidat (Conv>0.5 + L/S<{config.LS_EXTREME_THRESH})")
 
     # PANTAU (WAIT + |conv|>0.3) selalu ditampilkan
     watch = latest[

@@ -95,35 +95,6 @@ def main(force_refresh: bool = False):
                       else config.FORWARD_PERIOD_REVERSAL)
     print(f"  Forward period : {forward_period} candles (~{forward_period * 4}h) [{current_regime}]")
 
-    # ── STEP 1.5: BTC Directional Gate ─────────────────────
-    btc_signal = None
-    if config.BTC_GATE_ENABLED:
-        print("\n[1.5/4] Computing BTC directional signal...")
-        try:
-            from btc_research.btc_signal import compute_live_btc_signal
-            btc_signal = compute_live_btc_signal(
-                train_days   = config.BTC_GATE_TRAIN_DAYS,
-                fps          = config.BTC_GATE_FPS,
-                ic_threshold = config.BTC_GATE_IC_THRESHOLD,
-                long_thr     = config.BTC_GATE_LONG_THR,
-                short_thr    = config.BTC_GATE_SHORT_THR,
-            )
-            forced_tag = ' [FORCED via env]' if btc_signal.get('forced') else ''
-            print(f"  BTC composite : {btc_signal['composite']:+.3f}  → MODE: "
-                  f"{btc_signal['mode']}{forced_tag}")
-            meta = btc_signal.get('factors_meta', {})
-            if meta:
-                print(f"  Factors used  : {len(meta)} (sign · best_fp · IC train)")
-                for f, m in meta.items():
-                    sign_c = '+' if m['sign'] > 0 else '-'
-                    print(f"    {f:<18} {sign_c}   fp={m['best_fp']:>2}   "
-                          f"ic={m['best_ic']:+.3f}")
-            if btc_signal.get('btc_close'):
-                print(f"  BTC last      : ${btc_signal['btc_close']:,.1f} @ {btc_signal['last_dt']}")
-        except Exception as e:
-            print(f"  ✗ BTC signal gagal: {e} — fallback gate=BULL")
-            btc_signal = {'mode': 'BULL', 'composite': None, 'signs': {}, 'forced': False}
-
     # ── STEP 2: Build Factors ──────────────────────────────
     print("\n[2/4] Building factors...")
     panel = build_panel(raw_data, btc_df=btc_df, forward_period=forward_period)
@@ -181,7 +152,6 @@ def main(force_refresh: bool = False):
         panel_scored, top_n=20, score_col='composite_score',
         universe_symbols=current_universe or None,
         regime=current_regime,
-        btc_signal=btc_signal,
     )
 
     os.makedirs("./output", exist_ok=True)
