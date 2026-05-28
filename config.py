@@ -63,7 +63,7 @@ BTC_REGIME_MA       = 50            # MA period deteksi regime (candle)
 REGIME_BULL_THRESH  = 0.0           # close > MA(50) = bull
 
 # ── BTC Directional Gate (untuk alt ranking) ───────────────
-BTC_GATE_ENABLED        = True
+BTC_GATE_ENABLED        = False
 BTC_GATE_LONG_THR       = 1.0       # composite > ini → BULL → boleh LONG alts
 BTC_GATE_SHORT_THR      = -1.0      # composite < ini → BEAR → emit SHORT alts
 BTC_GATE_TRAIN_DAYS     = 45        # walk-forward train window untuk BTC weights

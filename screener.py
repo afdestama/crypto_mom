@@ -90,16 +90,16 @@ def compute_trade_decision(row: pd.Series, regime: str = 'reversal',
     if regime == 'trend':
         score *= 1.1
 
-    # Hard filter LONG: funding negatif (shorts bayar) + L/S < 1.5 (tidak overcrowded)
+    # Hard filter LONG: funding tidak extreme positif + L/S tidak overcrowded
     fr_val = row.get('funding_rate_raw', np.nan)
     ls_val = row.get('ls_ratio_raw', np.nan)
     long_ok = (
-        (pd.isna(fr_val) or float(fr_val) < 0) and
+        (pd.isna(fr_val) or float(fr_val) < config.FUNDING_EXTREME_THRESH) and
         (pd.isna(ls_val) or float(ls_val) < config.LS_EXTREME_THRESH)
     )
-    # Hard filter SHORT: funding positif (longs bayar) OR L/S > LS_EXTREME_THRESH
+    # Hard filter SHORT: funding extreme positif OR L/S overcrowded
     short_ok = (
-        (pd.notna(fr_val) and float(fr_val) > 0) or
+        (pd.notna(fr_val) and float(fr_val) > config.FUNDING_EXTREME_THRESH) or
         (pd.notna(ls_val) and float(ls_val) > config.LS_EXTREME_THRESH)
     )
 
