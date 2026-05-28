@@ -1,0 +1,10 @@
+ccxt
+pandas
+numpy
+scipy
+requests
+python-dotenv
+pyarrow
+matplotlib
+seaborn
+tqdm
